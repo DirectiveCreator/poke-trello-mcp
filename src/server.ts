@@ -83,11 +83,16 @@ class TrelloClient {
       console.log(`[Trello] -> ${response.status}`);
     }
 
+    // Read the response body once and store it
+    const responseText = await response.text();
     let data: any;
+    
     try {
-      data = await response.json();
-    } catch {
-      data = { text: await response.text() };
+      // Try to parse as JSON
+      data = responseText ? JSON.parse(responseText) : {};
+    } catch (e) {
+      // If not JSON, return as text object
+      data = { text: responseText };
     }
 
     if (!response.ok) {
