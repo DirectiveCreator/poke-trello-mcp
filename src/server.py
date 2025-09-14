@@ -38,6 +38,7 @@ import uvicorn
 from typing import Any, Dict
 from collections import defaultdict
 import time
+import json
 
 logger = logging.getLogger("trello_mcp")
 
@@ -347,6 +348,17 @@ def set_active_workspace(workspaceId: str) -> dict:
     _active_workspace_id = workspaceId
     return {"active_workspace_id": _active_workspace_id}
 
+# Helper function to handle authentication
+def check_auth(auth_token: str | None) -> bool:
+    """Check if the provided auth token is valid."""
+    if ENVIRONMENT != "production" and not MCP_AUTH_TOKEN:
+        return True  # Allow in dev mode without token
+    if not MCP_AUTH_TOKEN:
+        return False
+    if not auth_token:
+        return False
+    return hmac.compare_digest(auth_token, MCP_AUTH_TOKEN)
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     
@@ -368,10 +380,19 @@ if __name__ == "__main__":
     
     logger.info(f"Starting {SERVER_NAME} on {host}:{port}")
     logger.info(f"Environment: {ENVIRONMENT} | Auth: {bool(MCP_AUTH_TOKEN)} | Debug: {DEBUG}")
+    logger.info("Transport: HTTP (stateless mode)")
+    logger.info("Endpoints:")
+    logger.info("  - POST /mcp - JSON-RPC protocol (for Poke)")
+    logger.info("  - GET /mcp - SSE protocol (for MCP Inspector)")
+    logger.info("Both SSE and JSON-RPC are supported automatically")
     
+    # Run with stateless HTTP which supports both protocols:
+    # - SSE for clients that send Accept: text/event-stream
+    # - JSON-RPC for clients that send Accept: application/json
     mcp.run(
         transport="http",
         host=host,
         port=port,
-        stateless_http=True
+        stateless_http=True,
+        # FastMCP automatically handles content negotiation in stateless mode
     )
