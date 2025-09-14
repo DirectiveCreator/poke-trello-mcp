@@ -30,10 +30,6 @@ if not DEBUG:
 # Now import modules
 from fastmcp import FastMCP
 import httpx
-from starlette.applications import Starlette
-from starlette.responses import JSONResponse
-from starlette.routing import Route, Mount
-import uvicorn
 
 logger = logging.getLogger("trello_mcp")
 
@@ -290,29 +286,13 @@ def set_active_workspace(workspaceId: str) -> dict:
     _active_workspace_id = workspaceId
     return {"active_workspace_id": _active_workspace_id}
 
-# Create health endpoint
-async def health(request):
-    return JSONResponse({"status": "ok", "name": SERVER_NAME, "endpoint": "/mcp"})
-
-# Create the ASGI app with health endpoint and MCP
-def create_app():
-    """Create the ASGI application with health endpoint."""
-    # Get the MCP ASGI app
-    mcp_asgi = mcp.get_asgi_app(transport="http", stateless_http=True)
-    
-    # Create Starlette app with health route and mount MCP
-    app = Starlette(routes=[
-        Route("/", health),
-        Route("/health", health),
-        Mount("/", app=mcp_asgi),  # MCP handles /mcp internally
-    ])
-    return app
-
-# Export for uvicorn
-app = create_app()
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     host = "0.0.0.0"
-    logger.info(f"Starting {SERVER_NAME} on {host}:{port} | Health: / and /health | SSE: /mcp | DEBUG={DEBUG}")
-    uvicorn.run(app, host=host, port=port)
+    logger.info(f"Starting {SERVER_NAME} on {host}:{port} | SSE endpoint: /mcp | DEBUG={DEBUG}")
+    mcp.run(
+        transport="http",
+        host=host,
+        port=port,
+        stateless_http=True
+    )
