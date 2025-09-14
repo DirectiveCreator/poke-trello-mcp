@@ -3,6 +3,31 @@
 import os
 import typing as t
 import logging
+
+# Configure logging BEFORE importing anything else
+DEBUG = os.environ.get("MCP_DEBUG", "0").lower() in {"1", "true", "yes"}
+LOG_LEVEL = logging.DEBUG if DEBUG else logging.INFO
+
+# Set up root logger
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+
+# Suppress noisy logs BEFORE importing the modules
+if not DEBUG:
+    # Suppress all MCP streamable_http errors
+    logging.getLogger("mcp.server.streamable_http").setLevel(logging.CRITICAL)
+    logging.getLogger("mcp.server.streamable_http_manager").setLevel(logging.CRITICAL)
+    logging.getLogger("mcp.server").setLevel(logging.WARNING)
+    logging.getLogger("mcp").setLevel(logging.WARNING)
+    # Suppress uvicorn access logs for 404/406
+    logging.getLogger("uvicorn.access").setLevel(logging.ERROR)
+    logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
+    # Also suppress anyio errors
+    logging.getLogger("anyio").setLevel(logging.CRITICAL)
+
+# Now import modules
 from fastmcp import FastMCP
 import httpx
 from starlette.applications import Starlette
@@ -10,24 +35,9 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route, Mount
 import uvicorn
 
-SERVER_NAME = "Trello MCP Server"
-
-# Logging configuration
-DEBUG = os.environ.get("MCP_DEBUG", "0").lower() in {"1", "true", "yes"}
-LOG_LEVEL = logging.DEBUG if DEBUG else logging.INFO
-logging.basicConfig(
-    level=LOG_LEVEL,
-    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-)
 logger = logging.getLogger("trello_mcp")
 
-# Suppress noisy MCP errors when not debugging
-if not DEBUG:
-    # Suppress ClosedResourceError spam from health checks
-    logging.getLogger("mcp.server.streamable_http").setLevel(logging.CRITICAL)
-    logging.getLogger("mcp.server.streamable_http_manager").setLevel(logging.WARNING)
-    # Reduce uvicorn access log noise
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+SERVER_NAME = "Trello MCP Server"
 
 TRELLO_BASE_URL = "https://api.trello.com/1"
 API_KEY = os.environ.get("TRELLO_API_KEY")
