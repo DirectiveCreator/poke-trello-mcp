@@ -15,7 +15,7 @@ POKE_API_KEY = "pk_wsnMs_5gWmDJnxnpMtwhQmmOpfdEaCNHP9CIkoWQMTM"
 POKE_API_URL = "https://poke.com/api/v1/inbound-sms/webhook"
 
 # Your MCP server details
-MCP_SERVER_URL = "https://poke-trello-mcp.onrender.com/mcp"
+MCP_SERVER_URL = "https://poke-trello-mcp.onrender.com/mcp"  # Note: /mcp endpoint
 MCP_AUTH_TOKEN = "0USbNEFqvtn3cWCmj4KsVwyrH598QDZh"
 
 def send_poke_message(message):
@@ -52,23 +52,42 @@ def test_mcp_direct():
     print("Testing MCP Server Directly")
     print("="*50)
     
-    # Test health endpoint
+    # Test root endpoint
     try:
-        health_url = MCP_SERVER_URL.replace('/mcp', '/health')
-        response = requests.get(health_url)
-        print(f"Health check: {response.status_code}")
-        if response.status_code == 200:
-            print(f"Health response: {response.json()}")
+        root_url = "https://poke-trello-mcp.onrender.com/"
+        response = requests.get(root_url)
+        print(f"Root endpoint /: {response.status_code}")
     except Exception as e:
-        print(f"Health check failed: {e}")
+        print(f"Root check failed: {e}")
     
-    # Test MCP endpoint with JSON-RPC
+    # Test MCP endpoint with different methods
+    url_with_auth = f"{MCP_SERVER_URL}?token={MCP_AUTH_TOKEN}"
+    
+    # Test 1: GET request (SSE)
+    print(f"\nTest 1: GET {url_with_auth}")
+    try:
+        headers = {'Accept': 'text/event-stream'}
+        response = requests.get(url_with_auth, headers=headers, stream=True)
+        print(f"GET Status: {response.status_code}")
+        print(f"Content-Type: {response.headers.get('content-type')}")
+        if response.status_code == 200:
+            # Read first few lines of SSE stream
+            lines = []
+            for i, line in enumerate(response.iter_lines()):
+                if i >= 5:  # Only read first 5 lines
+                    break
+                lines.append(line.decode('utf-8') if line else '')
+            print(f"SSE Response (first 5 lines): {lines}")
+    except Exception as e:
+        print(f"GET test failed: {e}")
+    
+    # Test 2: POST with JSON-RPC
+    print(f"\nTest 2: POST JSON-RPC to {url_with_auth}")
     headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
     }
     
-    # JSON-RPC request to list tools
     json_rpc_request = {
         "jsonrpc": "2.0",
         "method": "tools/list",
@@ -76,19 +95,28 @@ def test_mcp_direct():
         "id": 1
     }
     
-    url_with_auth = f"{MCP_SERVER_URL}?token={MCP_AUTH_TOKEN}"
-    
-    print(f"\nTesting JSON-RPC at: {url_with_auth}")
     try:
         response = requests.post(url_with_auth, headers=headers, json=json_rpc_request)
-        print(f"JSON-RPC Status: {response.status_code}")
+        print(f"POST Status: {response.status_code}")
         print(f"Response Headers: {dict(response.headers)}")
         if response.status_code == 200:
             print(f"Response: {response.text[:500]}")  # First 500 chars
         else:
             print(f"Error Response: {response.text}")
     except Exception as e:
-        print(f"JSON-RPC test failed: {e}")
+        print(f"POST test failed: {e}")
+    
+    # Test 3: Test without auth token
+    print(f"\nTest 3: Testing authentication requirement")
+    try:
+        response = requests.post(MCP_SERVER_URL, headers=headers, json=json_rpc_request)
+        print(f"No auth status: {response.status_code}")
+        if response.status_code == 401:
+            print("✓ Authentication properly enforced")
+        else:
+            print(f"Warning: Got {response.status_code} without auth token")
+    except Exception as e:
+        print(f"Auth test failed: {e}")
 
 def test_poke_commands():
     """Test various Poke commands that should trigger MCP tools"""
@@ -98,15 +126,14 @@ def test_poke_commands():
     
     test_messages = [
         "clearhistory",  # Reset Poke session
-        "Show all my Trello boards",
-        "List all lists on my active Trello board",
-        "What Trello cards are assigned to me?",
-        "Show recent activity on my Trello board"
+        "What MCP integrations do you have?",
+        "Can you connect to the Trello MCP server?",
+        "List my Trello boards using the MCP integration",
     ]
     
     for message in test_messages:
         result = send_poke_message(message)
-        time.sleep(3)  # Wait between messages to avoid rate limiting
+        time.sleep(5)  # Wait longer between messages
 
 def diagnose_connection():
     """Diagnose the connection between Poke and MCP"""
@@ -114,16 +141,21 @@ def diagnose_connection():
     print("Connection Diagnosis")
     print("="*50)
     
-    # First, ask Poke about its connections
-    send_poke_message("What integrations do you have connected?")
-    time.sleep(3)
+    # Try different connection methods
+    test_urls = [
+        f"https://poke-trello-mcp.onrender.com/mcp?token={MCP_AUTH_TOKEN}",
+        f"https://poke-trello-mcp.onrender.com/mcp",
+        "https://poke-trello-mcp.onrender.com",
+    ]
     
-    # Try to get Poke to explicitly use the MCP connection
-    send_poke_message(f"Connect to MCP server at {MCP_SERVER_URL}")
-    time.sleep(3)
-    
-    # Test if Poke recognizes Trello commands
-    send_poke_message("Do you have access to Trello tools?")
+    for url in test_urls:
+        print(f"\nAsking Poke to connect to: {url}")
+        send_poke_message(f"Connect to MCP server at {url}")
+        time.sleep(5)
+        
+        # Test if connection worked
+        send_poke_message("Can you list my Trello boards?")
+        time.sleep(5)
 
 def check_server_logs():
     """Instructions for checking server logs"""

@@ -380,14 +380,13 @@ if __name__ == "__main__":
     
     logger.info(f"Starting {SERVER_NAME} on {host}:{port}")
     logger.info(f"Environment: {ENVIRONMENT} | Auth: {bool(MCP_AUTH_TOKEN)} | Debug: {DEBUG}")
-    logger.info("Transport: HTTP (simple mode without stateless_http)")
-    logger.info("This configuration works with Poke based on reference implementations")
+    logger.info("Transport: SSE (Server-Sent Events)")
+    logger.info("Endpoint: /sse")
     
-    # Use simple HTTP transport like the working Poke integrations
-    # Do NOT use stateless_http=True as it has strict Accept header requirements
+    # Use SSE transport which should work with Poke
+    # SSE is simpler and doesn't have the dual Accept header requirement
     mcp.run(
-        transport="http",
+        transport="sse",
         host=host,
         port=port
-        # Note: NOT using stateless_http=True to avoid the Accept header issue
     )

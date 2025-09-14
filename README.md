@@ -19,14 +19,14 @@ Click the "Deploy to Render" button above.
 4. Select this repository
 5. Render will automatically detect the `render.yaml` configuration
 
-Your server will be available at https://your-service-name.onrender.com/mcp (NOTE THE /mcp).
+Your server will be available at https://your-service-name.onrender.com/sse (NOTE THE /sse endpoint).
 
 ## Poke Setup (Trello MCP)
 
 You can connect your MCP server to Poke at [poke.com/settings/connections](https://poke.com/settings/connections).
 
 - In Poke, go to Settings → Connections → Integrations → New.
-- Add an MCP integration with URL: https://<your-render-service>.onrender.com/mcp
+- Add an MCP integration with URL: https://<your-render-service>.onrender.com/sse?token=YOUR_MCP_AUTH_TOKEN
 - Once connected, you can call Trello tools via natural prompts or explicit tool usage.
 - If Poke seems to cling to an old connection, send `clearhistory` to reset the session.
 
