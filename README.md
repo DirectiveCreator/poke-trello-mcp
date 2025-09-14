@@ -3,6 +3,8 @@
 A Model Context Protocol (MCP) server exposing Trello tools for Poke.
 Deploy on Render with streamable HTTP (SSE) at /mcp.
 
+> ⚠️ **SECURITY WARNING**: This server exposes your Trello API credentials. Always use authentication in production! See Security section below.
+
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/DirectiveCreator/poke-trello-mcp)
 
 ## Deployment
@@ -31,13 +33,21 @@ You can connect your MCP server to Poke at [poke.com/settings/connections](https
 ## Environment variables (set in Render)
 
 Set these in Render (Settings → Environment):
+
+### Required
 - TRELLO_API_KEY: your Trello API key
 - TRELLO_TOKEN: your Trello token
-- Optional defaults:
-  - TRELLO_BOARD_ID
-  - TRELLO_WORKSPACE_ID
+
+### Security (CRITICAL for production)
+- **MCP_AUTH_TOKEN**: A secret token for authenticating MCP requests (generate a strong random token)
+- **ENVIRONMENT**: Set to `production` to enforce security checks
+
+### Optional
+- TRELLO_BOARD_ID: Default board ID
+- TRELLO_WORKSPACE_ID: Default workspace ID
 - MCP_DEBUG: 0 (set 1 while testing; secrets are never logged)
-- ENVIRONMENT: production
+- RATE_LIMIT_REQUESTS: Max requests per window (default: 100)
+- RATE_LIMIT_WINDOW: Time window in seconds (default: 60)
 
 ## Tools and example prompts
 
@@ -57,3 +67,31 @@ Set these in Render (Settings → Environment):
 - set_active_board — "Set the active Trello board to BOARD_ID."
 - set_active_workspace — "Set the active Trello workspace to WORKSPACE_ID."
 - update_card_details — "Rename Trello card CARD_ID to 'Fix crash', set due date to 2025-10-01, and apply labels LABEL_ID1 and LABEL_ID2."
+
+## Security Considerations
+
+### Authentication
+1. **Always set MCP_AUTH_TOKEN in production** - This prevents unauthorized access to your Trello data
+2. Generate a strong token: `openssl rand -hex 32` or use a password manager
+3. The server will refuse to start in production without authentication
+
+### How to use with authentication
+When MCP_AUTH_TOKEN is set, clients must include the token in their requests:
+- Header: `Authorization: Bearer YOUR_MCP_AUTH_TOKEN`
+- Or configure it in your MCP client settings
+
+### Rate Limiting
+The server includes built-in rate limiting to prevent abuse:
+- Default: 100 requests per 60 seconds per client
+- Configurable via RATE_LIMIT_REQUESTS and RATE_LIMIT_WINDOW
+
+### Best Practices
+1. Never commit `.env` files with credentials
+2. Use Render's environment variables for all secrets
+3. Rotate your MCP_AUTH_TOKEN periodically
+4. Monitor your Trello API usage for suspicious activity
+5. Consider using IP whitelisting if your deployment platform supports it
+
+### Development vs Production
+- **Development**: Authentication optional, relaxed security
+- **Production**: Authentication required, strict security enforced

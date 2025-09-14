@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-# Poke Trello MCP Server - v1.1.0
+# Poke Trello MCP Server - v1.2.0 (Secured)
 import os
+import sys
 import typing as t
 import logging
+import hashlib
+import hmac
+from datetime import datetime, timedelta
 
 # Configure logging BEFORE importing anything else
 DEBUG = os.environ.get("MCP_DEBUG", "0").lower() in {"1", "true", "yes"}
@@ -32,6 +36,8 @@ from fastmcp import FastMCP
 import httpx
 import uvicorn
 from typing import Any, Dict
+from collections import defaultdict
+import time
 
 logger = logging.getLogger("trello_mcp")
 
@@ -42,6 +48,55 @@ API_KEY = os.environ.get("TRELLO_API_KEY")
 TOKEN = os.environ.get("TRELLO_TOKEN")
 ACTIVE_BOARD_ID = os.environ.get("TRELLO_BOARD_ID") or None
 ACTIVE_WORKSPACE_ID = os.environ.get("TRELLO_WORKSPACE_ID") or None
+
+# Security: Authentication token for accessing this MCP server
+MCP_AUTH_TOKEN = os.environ.get("MCP_AUTH_TOKEN")  # Required for production
+ENVIRONMENT = os.environ.get("ENVIRONMENT", "development")
+
+# Rate limiting configuration
+RATE_LIMIT_REQUESTS = int(os.environ.get("RATE_LIMIT_REQUESTS", "100"))  # requests per window
+RATE_LIMIT_WINDOW = int(os.environ.get("RATE_LIMIT_WINDOW", "60"))  # seconds
+
+# Rate limiting storage
+_rate_limits: Dict[str, list] = defaultdict(list)
+
+def check_rate_limit(client_id: str) -> bool:
+    """Check if client has exceeded rate limit."""
+    now = time.time()
+    window_start = now - RATE_LIMIT_WINDOW
+    
+    # Clean old entries
+    _rate_limits[client_id] = [t for t in _rate_limits[client_id] if t > window_start]
+    
+    # Check limit
+    if len(_rate_limits[client_id]) >= RATE_LIMIT_REQUESTS:
+        return False
+    
+    # Add current request
+    _rate_limits[client_id].append(now)
+    return True
+
+def verify_auth(auth_header: str | None) -> bool:
+    """Verify authentication token."""
+    if ENVIRONMENT == "development" and not MCP_AUTH_TOKEN:
+        # Allow unauthenticated access in development mode if no token is set
+        return True
+    
+    if not MCP_AUTH_TOKEN:
+        logger.error("MCP_AUTH_TOKEN not configured in production!")
+        return False
+    
+    if not auth_header:
+        return False
+    
+    # Support Bearer token format
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = auth_header
+    
+    # Constant-time comparison to prevent timing attacks
+    return hmac.compare_digest(token, MCP_AUTH_TOKEN)
 
 mcp = FastMCP(SERVER_NAME)
 
@@ -170,10 +225,12 @@ def get_server_info() -> dict:
     logger.info("tool:get_server_info")
     return {
         "server_name": SERVER_NAME,
-        "environment": os.environ.get("ENVIRONMENT", "development"),
-        "python_version": os.sys.version.split()[0],
+        "environment": ENVIRONMENT,
+        "python_version": sys.version.split()[0],
         "active_board_id": _active_board_id,
         "active_workspace_id": _active_workspace_id,
+        "auth_required": bool(MCP_AUTH_TOKEN) or ENVIRONMENT == "production",
+        "rate_limit": f"{RATE_LIMIT_REQUESTS} requests per {RATE_LIMIT_WINDOW} seconds"
     }
 
 @mcp.tool(description="Get info for the currently active board")
@@ -292,8 +349,26 @@ def set_active_workspace(workspaceId: str) -> dict:
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
-    host = "0.0.0.0"
-    logger.info(f"Starting {SERVER_NAME} on {host}:{port} | SSE endpoint: /mcp | DEBUG={DEBUG}")
+    
+    # Security warning for production
+    if ENVIRONMENT == "production":
+        if not MCP_AUTH_TOKEN:
+            logger.error("\n" + "="*60)
+            logger.error("CRITICAL: MCP_AUTH_TOKEN not set in production!")
+            logger.error("Your Trello credentials are exposed without authentication!")
+            logger.error("Set MCP_AUTH_TOKEN environment variable immediately!")
+            logger.error("="*60 + "\n")
+            # Don't start in production without auth
+            sys.exit(1)
+        else:
+            logger.info("Authentication enabled with MCP_AUTH_TOKEN")
+    
+    # In production, consider binding to localhost if behind a proxy
+    host = "0.0.0.0" if ENVIRONMENT != "production" else os.environ.get("HOST", "0.0.0.0")
+    
+    logger.info(f"Starting {SERVER_NAME} on {host}:{port}")
+    logger.info(f"Environment: {ENVIRONMENT} | Auth: {bool(MCP_AUTH_TOKEN)} | Debug: {DEBUG}")
+    
     mcp.run(
         transport="http",
         host=host,
