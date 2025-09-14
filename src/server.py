@@ -30,6 +30,8 @@ if not DEBUG:
 # Now import modules
 from fastmcp import FastMCP
 import httpx
+import uvicorn
+from typing import Any, Dict
 
 logger = logging.getLogger("trello_mcp")
 
@@ -213,8 +215,18 @@ def get_cards_by_list_id(listId: str) -> list[dict]:
     return client.get_cards_by_list(listId)
 
 @mcp.tool(description="Create a Trello card in a list")
-def add_card_to_list(listId: str, name: str, description: str | None = None, dueDate: str | None = None, labels: list[str] | None = None) -> dict:
-    # Accept camelCase as exposed in schema and map to client internals
+def add_card_to_list(**kwargs) -> dict:
+    """Accept multiple parameter name variations for Poke compatibility."""
+    # Map various parameter names to expected ones
+    listId = kwargs.get('listId') or kwargs.get('list_id') or kwargs.get('idList')
+    name = kwargs.get('name') or kwargs.get('title')
+    description = kwargs.get('description') or kwargs.get('desc')
+    dueDate = kwargs.get('dueDate') or kwargs.get('due_date') or kwargs.get('due')
+    labels = kwargs.get('labels') or kwargs.get('idLabels') or kwargs.get('label_ids')
+    
+    if not listId or not name:
+        raise ValueError("Required parameters: listId and name")
+    
     logger.info(f"tool:add_card_to_list listId={listId} name={name!r} dueDate={dueDate} labels_count={(len(labels) if labels else 0)}")
     client = get_client()
     return client.add_card_to_list(list_id=listId, name=name, description=description, dueDate=dueDate, labels=labels)
@@ -232,13 +244,31 @@ def attach_image_to_card(cardId: str, imageUrl: str, name: str | None = None) ->
     return client.attach_image_to_card(card_id=cardId, image_url=imageUrl, name=name)
 
 @mcp.tool(description="Move a card to another list on the same board")
-def move_card(cardId: str, listId: str, pos: str | None = None) -> dict:
+def move_card(**kwargs) -> dict:
+    """Accept multiple parameter name variations for Poke compatibility."""
+    cardId = kwargs.get('cardId') or kwargs.get('card_id') or kwargs.get('idCard') or kwargs.get('id')
+    listId = kwargs.get('listId') or kwargs.get('list_id') or kwargs.get('idList') or kwargs.get('toListId')
+    pos = kwargs.get('pos') or kwargs.get('position')
+    
+    if not cardId or not listId:
+        raise ValueError("Required parameters: cardId and listId")
+    
     logger.info(f"tool:move_card cardId={cardId} listId={listId} pos={pos}")
     client = get_client()
     return client.move_card(card_id=cardId, list_id=listId, pos=pos)
 
 @mcp.tool(description="Update card details: name, description, dueDate, labels")
-def update_card_details(cardId: str, name: str | None = None, description: str | None = None, dueDate: str | None = None, labels: list[str] | None = None) -> dict:
+def update_card_details(**kwargs) -> dict:
+    """Accept multiple parameter name variations for Poke compatibility."""
+    cardId = kwargs.get('cardId') or kwargs.get('card_id') or kwargs.get('idCard') or kwargs.get('id')
+    name = kwargs.get('name') or kwargs.get('title')
+    description = kwargs.get('description') or kwargs.get('desc')
+    dueDate = kwargs.get('dueDate') or kwargs.get('due_date') or kwargs.get('due')
+    labels = kwargs.get('labels') or kwargs.get('idLabels') or kwargs.get('label_ids')
+    
+    if not cardId:
+        raise ValueError("Required parameter: cardId")
+    
     logger.info(f"tool:update_card_details cardId={cardId} name={name!r} dueDate={dueDate} labels_count={(len(labels) if labels else 0)}")
     client = get_client()
     return client.update_card_details(card_id=cardId, name=name, description=description, dueDate=dueDate, labels=labels)
