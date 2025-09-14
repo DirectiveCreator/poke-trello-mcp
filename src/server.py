@@ -380,19 +380,14 @@ if __name__ == "__main__":
     
     logger.info(f"Starting {SERVER_NAME} on {host}:{port}")
     logger.info(f"Environment: {ENVIRONMENT} | Auth: {bool(MCP_AUTH_TOKEN)} | Debug: {DEBUG}")
-    logger.info("Transport: HTTP (stateless mode)")
-    logger.info("Endpoints:")
-    logger.info("  - POST /mcp - JSON-RPC protocol (for Poke)")
-    logger.info("  - GET /mcp - SSE protocol (for MCP Inspector)")
-    logger.info("Both SSE and JSON-RPC are supported automatically")
+    logger.info("Transport: HTTP (simple mode without stateless_http)")
+    logger.info("This configuration works with Poke based on reference implementations")
     
-    # Run with stateless HTTP which supports both protocols:
-    # - SSE for clients that send Accept: text/event-stream
-    # - JSON-RPC for clients that send Accept: application/json
+    # Use simple HTTP transport like the working Poke integrations
+    # Do NOT use stateless_http=True as it has strict Accept header requirements
     mcp.run(
         transport="http",
         host=host,
-        port=port,
-        stateless_http=True,
-        # FastMCP automatically handles content negotiation in stateless mode
+        port=port
+        # Note: NOT using stateless_http=True to avoid the Accept header issue
     )
