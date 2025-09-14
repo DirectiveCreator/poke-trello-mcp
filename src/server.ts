@@ -204,16 +204,13 @@ server.addTool({
   parameters: z.object({}),
   execute: async () => {
     console.log('tool:get_server_info');
-    return JSON.stringify({
-      server_name: SERVER_NAME,
-      version: '2.0.0',
-      environment: process.env.ENVIRONMENT || 'development',
-      node_version: process.version,
-      active_board_id: activeBoard,
-      active_workspace_id: activeWorkspace,
-      health_status: 'healthy',
-      uptime: process.uptime(),
-    });
+    // Return as plain text string for server info
+    return `Server: ${SERVER_NAME} v2.0.0
+Environment: ${process.env.ENVIRONMENT || 'development'}
+Node: ${process.version}
+Active Board: ${activeBoard || 'none'}
+Active Workspace: ${activeWorkspace || 'none'}
+Uptime: ${process.uptime()}s`;
   },
 });
 
@@ -229,7 +226,8 @@ server.addTool({
     }
     const client = getClient();
     const result = await client.getBoard(activeBoard);
-    return JSON.stringify(result);
+    // Return formatted text response
+    return `Board: ${result.name}\nID: ${result.id}\nURL: ${result.url}`;
   },
 });
 
@@ -242,7 +240,7 @@ server.addTool({
   execute: async ({ boardId }) => {
     console.log(`tool:set_active_board boardId=${boardId}`);
     activeBoard = boardId;
-    return JSON.stringify({ success: true, active_board_id: boardId });
+    return `Active board set to: ${boardId}`;
   },
 });
 
@@ -253,8 +251,12 @@ server.addTool({
   execute: async () => {
     console.log('tool:list_boards');
     const client = getClient();
-    const result = await client.listBoards();
-    return JSON.stringify(result);
+    const boards = await client.listBoards();
+    // Format boards as readable text
+    if (!boards || boards.length === 0) {
+      return 'No boards found';
+    }
+    return boards.map((b: any) => `• ${b.name} (ID: ${b.id})`).join('\n');
   },
 });
 
@@ -267,8 +269,11 @@ server.addTool({
   execute: async ({ workspaceId }) => {
     console.log(`tool:list_boards_in_workspace workspaceId=${workspaceId}`);
     const client = getClient();
-    const result = await client.listBoardsInWorkspace(workspaceId);
-    return JSON.stringify(result);
+    const boards = await client.listBoardsInWorkspace(workspaceId);
+    if (!boards || boards.length === 0) {
+      return 'No boards found in this workspace';
+    }
+    return boards.map((b: any) => `• ${b.name} (ID: ${b.id})`).join('\n');
   },
 });
 
@@ -280,8 +285,11 @@ server.addTool({
   execute: async () => {
     console.log('tool:list_workspaces');
     const client = getClient();
-    const result = await client.listWorkspaces();
-    return JSON.stringify(result);
+    const workspaces = await client.listWorkspaces();
+    if (!workspaces || workspaces.length === 0) {
+      return 'No workspaces found';
+    }
+    return workspaces.map((w: any) => `• ${w.displayName || w.name} (ID: ${w.id})`).join('\n');
   },
 });
 
@@ -294,7 +302,7 @@ server.addTool({
   execute: async ({ workspaceId }) => {
     console.log(`tool:set_active_workspace workspaceId=${workspaceId}`);
     activeWorkspace = workspaceId;
-    return JSON.stringify({ success: true, active_workspace_id: workspaceId });
+    return `Active workspace set to: ${workspaceId}`;
   },
 });
 
@@ -312,8 +320,15 @@ server.addTool({
       throw new TrelloError('No board specified and no active board is set.');
     }
     const client = getClient();
-    const result = await client.getLists(board);
-    return JSON.stringify(result);
+    const lists = await client.getLists(board);
+    // Format lists as readable text
+    if (!lists || lists.length === 0) {
+      return 'No lists found on this board';
+    }
+    return lists
+      .filter((l: any) => !l.closed)
+      .map((l: any) => `• ${l.name} (ID: ${l.id})`)
+      .join('\n');
   },
 });
 
@@ -331,8 +346,8 @@ server.addTool({
       throw new TrelloError('No board specified and no active board is set.');
     }
     const client = getClient();
-    const result = await client.addListToBoard(board, name);
-    return JSON.stringify(result);
+    const list = await client.addListToBoard(board, name);
+    return `List created successfully!\nName: ${list.name}\nID: ${list.id}`;
   },
 });
 
@@ -345,8 +360,8 @@ server.addTool({
   execute: async ({ listId }) => {
     console.log(`tool:archive_list listId=${listId}`);
     const client = getClient();
-    const result = await client.archiveList(listId);
-    return JSON.stringify(result);
+    await client.archiveList(listId);
+    return `List ${listId} has been archived successfully`;
   },
 });
 
@@ -360,8 +375,11 @@ server.addTool({
   execute: async ({ listId }) => {
     console.log(`tool:get_cards_by_list_id listId=${listId}`);
     const client = getClient();
-    const result = await client.getCardsByList(listId);
-    return JSON.stringify(result);
+    const cards = await client.getCardsByList(listId);
+    if (!cards || cards.length === 0) {
+      return 'No cards found in this list';
+    }
+    return cards.map((c: any) => `• ${c.name}${c.due ? ` (Due: ${c.due})` : ''} - ID: ${c.id}`).join('\n');
   },
 });
 
@@ -378,8 +396,8 @@ server.addTool({
   execute: async ({ listId, name, description, dueDate, labels }) => {
     console.log(`tool:add_card_to_list listId=${listId} name=${name}`);
     const client = getClient();
-    const result = await client.addCardToList(listId, name, description, dueDate, labels);
-    return JSON.stringify(result);
+    const card = await client.addCardToList(listId, name, description, dueDate, labels);
+    return `Card created successfully!\nName: ${card.name}\nID: ${card.id}${card.url ? `\nURL: ${card.url}` : ''}`;
   },
 });
 
@@ -392,8 +410,8 @@ server.addTool({
   execute: async ({ cardId }) => {
     console.log(`tool:archive_card cardId=${cardId}`);
     const client = getClient();
-    const result = await client.archiveCard(cardId);
-    return JSON.stringify(result);
+    await client.archiveCard(cardId);
+    return `Card ${cardId} has been archived successfully`;
   },
 });
 
@@ -408,8 +426,8 @@ server.addTool({
   execute: async ({ cardId, imageUrl, name }) => {
     console.log(`tool:attach_image_to_card cardId=${cardId} imageUrl=${imageUrl}`);
     const client = getClient();
-    const result = await client.attachImageToCard(cardId, imageUrl, name || 'Image Attachment');
-    return JSON.stringify(result);
+    const attachment = await client.attachImageToCard(cardId, imageUrl, name || 'Image Attachment');
+    return `Image attached successfully to card ${cardId}\nAttachment ID: ${attachment.id}`;
   },
 });
 
@@ -424,8 +442,8 @@ server.addTool({
   execute: async ({ cardId, listId, position }) => {
     console.log(`tool:move_card cardId=${cardId} listId=${listId} position=${position}`);
     const client = getClient();
-    const result = await client.moveCard(cardId, listId, position);
-    return JSON.stringify(result);
+    await client.moveCard(cardId, listId, position);
+    return `Card ${cardId} moved to list ${listId}${position ? ` at position ${position}` : ''}`;
   },
 });
 
@@ -442,8 +460,8 @@ server.addTool({
   execute: async ({ cardId, name, description, dueDate, labels }) => {
     console.log(`tool:update_card_details cardId=${cardId}`);
     const client = getClient();
-    const result = await client.updateCardDetails(cardId, name, description, dueDate, labels);
-    return JSON.stringify(result);
+    const card = await client.updateCardDetails(cardId, name, description, dueDate, labels);
+    return `Card ${cardId} updated successfully${name ? `\nName: ${name}` : ''}${dueDate ? `\nDue: ${dueDate}` : ''}`;
   },
 });
 
@@ -454,8 +472,11 @@ server.addTool({
   execute: async () => {
     console.log('tool:get_my_cards');
     const client = getClient();
-    const result = await client.getMyCards();
-    return JSON.stringify(result);
+    const cards = await client.getMyCards();
+    if (!cards || cards.length === 0) {
+      return 'No cards assigned to you';
+    }
+    return cards.map((c: any) => `• ${c.name} (Board: ${c.idBoard}) - ID: ${c.id}`).join('\n');
   },
 });
 
@@ -473,8 +494,11 @@ server.addTool({
       throw new TrelloError('No board specified and no active board is set.');
     }
     const client = getClient();
-    const result = await client.getRecentActivity(board, limit);
-    return JSON.stringify(result);
+    const activities = await client.getRecentActivity(board, limit);
+    if (!activities || activities.length === 0) {
+      return 'No recent activity found';
+    }
+    return activities.map((a: any) => `• ${a.type}: ${a.data?.card?.name || a.data?.list?.name || 'Unknown'} by ${a.memberCreator?.fullName || 'Unknown'}`).join('\n');
   },
 });
 
