@@ -1,16 +1,5 @@
 .env
 
-# Node.js / TypeScript
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-lerna-debug.log*
-.pnpm-debug.log*
-dist/
-*.tsbuildinfo
-.nyc_output/
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

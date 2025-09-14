@@ -1,13 +1,11 @@
 services:
   - type: web
     name: poke-trello-mcp
-    runtime: node
-    buildCommand: npm ci && npm run build
-    startCommand: npm start
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python src/server.py
     plan: free
     autoDeploy: false
     envVars:
       - key: ENVIRONMENT
-        value: production
-      - key: NODE_ENV
         value: production

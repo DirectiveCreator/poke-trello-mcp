@@ -1,8 +1,7 @@
-# Poke Trello MCP (TypeScript)
+# Poke Trello MCP
 
 A Model Context Protocol (MCP) server exposing Trello tools for Poke.
-Built with TypeScript and FastMCP framework.
-Deploy on Render with HTTP streaming at /mcp.
+Deploy on Render with streamable HTTP (SSE) at /mcp.
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/DirectiveCreator/poke-trello-mcp)
 
@@ -54,33 +53,7 @@ Set these in Render (Settings → Environment):
 - get_recent_activity — "Show the 25 most recent activities on the active Trello board."
 - list_boards — "Show all Trello boards I have access to."
 - list_boards_in_workspace — "Show all Trello boards in workspace WORKSPACE_ID."
-- list_workspaces — "Show all workspaces I have access to."
 - move_card — "Move the Trello card CARD_ID to list LIST_ID."
 - set_active_board — "Set the active Trello board to BOARD_ID."
 - set_active_workspace — "Set the active Trello workspace to WORKSPACE_ID."
 - update_card_details — "Rename Trello card CARD_ID to 'Fix crash', set due date to 2025-10-01, and apply labels LABEL_ID1 and LABEL_ID2."
-- get_server_info — "Get server info including version and active context."
-
-## Development
-
-### Prerequisites
-- Node.js 20+ 
-- TypeScript 5+
-
-### Local Setup
-```bash
-# Install dependencies
-npm install
-
-# Copy .env.example to .env and configure
-cp .env.example .env
-
-# Run in development mode
-npm run dev
-
-# Build for production
-npm run build
-
-# Start production server
-npm start
-```
