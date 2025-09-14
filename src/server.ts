@@ -91,13 +91,28 @@ class TrelloClient {
       // Try to parse as JSON
       data = responseText ? JSON.parse(responseText) : {};
     } catch (e) {
-      // If not JSON, return as text object
-      data = { text: responseText };
+      // If not JSON, check if it's an HTML error page (common for auth errors)
+      if (responseText.includes('<!DOCTYPE') || responseText.includes('<html')) {
+        console.error('Received HTML response - likely an authentication error');
+        throw new TrelloError('Authentication failed. Please check your TRELLO_API_KEY and TRELLO_TOKEN.');
+      }
+      // Otherwise return as text
+      data = responseText;
     }
 
     if (!response.ok) {
-      console.warn(`[Trello] ERROR ${response.status} on ${method} ${path}: ${JSON.stringify(data)}`);
-      throw new TrelloError(`Trello API error ${response.status}: ${JSON.stringify(data)}`);
+      // Special handling for 401 Unauthorized
+      if (response.status === 401) {
+        throw new TrelloError('Authentication failed. Invalid API key or token.');
+      }
+      // Special handling for 400 Bad Request  
+      if (response.status === 400 && typeof data === 'string' && data.includes('invalid')) {
+        throw new TrelloError(`Invalid request: ${data}`);
+      }
+      
+      const errorMsg = typeof data === 'string' ? data : JSON.stringify(data);
+      console.warn(`[Trello] ERROR ${response.status} on ${method} ${path}: ${errorMsg}`);
+      throw new TrelloError(`Trello API error ${response.status}: ${errorMsg}`);
     }
 
     return data;
@@ -250,13 +265,31 @@ server.addTool({
   parameters: z.object({}),
   execute: async () => {
     console.log('tool:list_boards');
-    const client = getClient();
-    const boards = await client.listBoards();
-    // Format boards as readable text
-    if (!boards || boards.length === 0) {
-      return 'No boards found';
+    try {
+      const client = getClient();
+      const boards = await client.listBoards();
+      console.log('Boards response type:', typeof boards, 'isArray:', Array.isArray(boards));
+      
+      // Handle different response types
+      if (!boards) {
+        return 'No boards found';
+      }
+      
+      // If it's not an array, log the actual response for debugging
+      if (!Array.isArray(boards)) {
+        console.error('Unexpected boards response:', boards);
+        return `Error: Received unexpected response type. Please check your Trello credentials.`;
+      }
+      
+      if (boards.length === 0) {
+        return 'No boards found';
+      }
+      
+      return boards.map((b: any) => `• ${b.name} (ID: ${b.id})`).join('\n');
+    } catch (error: any) {
+      console.error('Error in list_boards:', error);
+      return `Error listing boards: ${error.message}`;
     }
-    return boards.map((b: any) => `• ${b.name} (ID: ${b.id})`).join('\n');
   },
 });
 
